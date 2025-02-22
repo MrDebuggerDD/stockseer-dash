@@ -1,45 +1,19 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import StockChart from "@/components/StockChart";
 import StockPrice from "@/components/StockPrice";
 import NewsCard from "@/components/NewsCard";
 import StockSearch from "@/components/StockSearch";
 import PredictionCard from "@/components/PredictionCard";
+import { toast } from "sonner";
 
-// Mock data for demonstration
+// Mock chart data (replace with real API)
 const mockChartData = Array.from({ length: 30 }, (_, i) => ({
   date: new Date(2024, 0, i + 1).toLocaleDateString(),
   price: 150 + Math.random() * 50,
 }));
-
-const mockNews = [
-  {
-    title: "Market Rally Continues as Tech Stocks Surge",
-    source: "Financial Times",
-    sentiment: "positive" as const,
-    time: "2h ago",
-  },
-  {
-    title: "Global Markets Face Uncertainty Amid Economic Data",
-    source: "Reuters",
-    sentiment: "neutral" as const,
-    time: "4h ago",
-  },
-  {
-    title: "Inflation Concerns Weigh on Market Sentiment",
-    source: "Bloomberg",
-    sentiment: "negative" as const,
-    time: "5h ago",
-  },
-];
-
-// Mock prediction data
-const mockPrediction = {
-  direction: "up" as const,
-  confidence: 0.85,
-  nextTarget: 195.75,
-  timeframe: "24h",
-};
 
 const Index = () => {
   const [selectedStock, setSelectedStock] = useState({
@@ -49,16 +23,75 @@ const Index = () => {
     changePercent: 1.23,
   });
 
-  const handleSearch = (symbol: string) => {
-    // In a real application, this would fetch real data
-    console.log("Searching for symbol:", symbol);
-    // Simulate updating the stock data
-    setSelectedStock({
-      symbol,
-      price: 150 + Math.random() * 100,
-      change: -1.5 + Math.random() * 3,
-      changePercent: -1 + Math.random() * 2,
-    });
+  // Fetch news data
+  const { data: newsData, isLoading: isLoadingNews } = useQuery({
+    queryKey: ['news', selectedStock.symbol],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('fetch-news', {
+        body: { symbol: selectedStock.symbol }
+      });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedStock.symbol
+  });
+
+  // Fetch prediction data
+  const { data: predictionData, isLoading: isLoadingPrediction } = useQuery({
+    queryKey: ['prediction', selectedStock.symbol],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('stock-prediction', {
+        body: { 
+          symbol: selectedStock.symbol,
+          price: selectedStock.price
+        }
+      });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedStock.symbol
+  });
+
+  // Set up WebSocket connection for real-time price updates
+  useEffect(() => {
+    if (!selectedStock.symbol) return;
+
+    const channel = supabase
+      .channel('stock-updates')
+      .on('broadcast', { event: 'price-update' }, (payload) => {
+        if (payload.symbol === selectedStock.symbol) {
+          setSelectedStock(prev => ({
+            ...prev,
+            price: payload.price,
+            change: payload.change,
+            changePercent: payload.changePercent
+          }));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedStock.symbol]);
+
+  const handleSearch = async (symbol: string) => {
+    try {
+      // Simulate updating the stock data (replace with real API)
+      setSelectedStock({
+        symbol,
+        price: 150 + Math.random() * 100,
+        change: -1.5 + Math.random() * 3,
+        changePercent: -1 + Math.random() * 2,
+      });
+      
+      toast.success(`Successfully loaded data for ${symbol}`);
+    } catch (error) {
+      console.error('Error fetching stock data:', error);
+      toast.error('Failed to fetch stock data');
+    }
   };
 
   return (
@@ -78,8 +111,8 @@ const Index = () => {
         </div>
         <div className="space-y-6">
           <StockPrice {...selectedStock} />
-          <PredictionCard predictionData={mockPrediction} />
-          <NewsCard news={mockNews} />
+          {predictionData && <PredictionCard predictionData={predictionData} />}
+          {newsData && <NewsCard news={newsData} />}
         </div>
       </div>
     </div>
