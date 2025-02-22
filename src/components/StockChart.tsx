@@ -27,7 +27,7 @@ const StockChart = ({ data, isLoading }: StockChartProps) => {
         <AreaChart data={data}>
           <defs>
             <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#37B24D" stopOpacity={0.1} />
+              <stop offset="5%" stopColor="#37B24D" stopOpacity={0.2} />
               <stop offset="95%" stopColor="#37B24D" stopOpacity={0} />
             </linearGradient>
           </defs>
@@ -35,19 +35,20 @@ const StockChart = ({ data, isLoading }: StockChartProps) => {
             dataKey="date"
             axisLine={false}
             tickLine={false}
-            tick={{ fill: '#64748b', fontSize: 12 }}
+            tick={{ fill: '#94a3b8', fontSize: 12 }}
           />
           <YAxis
             axisLine={false}
             tickLine={false}
-            tick={{ fill: '#64748b', fontSize: 12 }}
+            tick={{ fill: '#94a3b8', fontSize: 12 }}
           />
           <Tooltip
             contentStyle={{
-              background: 'rgba(255, 255, 255, 0.8)',
+              background: 'rgba(30, 41, 59, 0.8)',
               border: 'none',
               borderRadius: '8px',
               boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+              color: '#f8fafc',
             }}
           />
           <Area
