@@ -9,18 +9,57 @@ import StockSearch from "@/components/StockSearch";
 import PredictionCard from "@/components/PredictionCard";
 import { toast } from "sonner";
 
-// Mock chart data (replace with real API)
-const mockChartData = Array.from({ length: 30 }, (_, i) => ({
-  date: new Date(2024, 0, i + 1).toLocaleDateString(),
-  price: 150 + Math.random() * 50,
-}));
+interface StockData {
+  symbol: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  logoUrl?: string;
+  companyName?: string;
+}
 
 const Index = () => {
-  const [selectedStock, setSelectedStock] = useState({
+  const [selectedStock, setSelectedStock] = useState<StockData>({
     symbol: "AAPL",
     price: 191.56,
     change: 2.34,
     changePercent: 1.23,
+  });
+
+  // Fetch stock details
+  const { data: stockDetails } = useQuery({
+    queryKey: ['stockDetails', selectedStock.symbol],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('stocks')
+        .select('*')
+        .eq('symbol', selectedStock.symbol)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedStock.symbol
+  });
+
+  // Fetch historical data
+  const { data: historicalData } = useQuery({
+    queryKey: ['historicalData', selectedStock.symbol],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('stock_historical_data')
+        .select('*')
+        .eq('symbol', selectedStock.symbol)
+        .order('date', { ascending: true })
+        .limit(30);
+      
+      if (error) throw error;
+      return data?.map(d => ({
+        date: new Date(d.date).toLocaleDateString(),
+        price: Number(d.close_price)
+      }));
+    },
+    enabled: !!selectedStock.symbol
   });
 
   // Fetch news data
@@ -44,14 +83,16 @@ const Index = () => {
       const { data, error } = await supabase.functions.invoke('stock-prediction', {
         body: { 
           symbol: selectedStock.symbol,
-          price: selectedStock.price
+          price: selectedStock.price,
+          historicalData: historicalData,
+          news: newsData
         }
       });
       
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedStock.symbol
+    enabled: !!selectedStock.symbol && !!historicalData && !!newsData
   });
 
   // Set up WebSocket connection for real-time price updates
@@ -79,12 +120,21 @@ const Index = () => {
 
   const handleSearch = async (symbol: string) => {
     try {
-      // Simulate updating the stock data (replace with real API)
+      const { data: stockInfo, error } = await supabase
+        .from('stocks')
+        .select('*')
+        .eq('symbol', symbol)
+        .single();
+
+      if (error) throw error;
+
       setSelectedStock({
         symbol,
-        price: 150 + Math.random() * 100,
-        change: -1.5 + Math.random() * 3,
-        changePercent: -1 + Math.random() * 2,
+        price: selectedStock.price,
+        change: selectedStock.change,
+        changePercent: selectedStock.changePercent,
+        logoUrl: stockInfo.logo_url,
+        companyName: stockInfo.company_name
       });
       
       toast.success(`Successfully loaded data for ${symbol}`);
@@ -107,10 +157,14 @@ const Index = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3">
-          <StockChart data={mockChartData} />
+          <StockChart data={historicalData || []} />
         </div>
         <div className="space-y-6">
-          <StockPrice {...selectedStock} />
+          <StockPrice 
+            {...selectedStock} 
+            logoUrl={stockDetails?.logo_url}
+            companyName={stockDetails?.company_name}
+          />
           {predictionData && <PredictionCard predictionData={predictionData} />}
           {newsData && <NewsCard news={newsData} />}
         </div>

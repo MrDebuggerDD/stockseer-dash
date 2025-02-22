@@ -144,6 +144,71 @@ export type Database = {
         }
         Relationships: []
       }
+      stock_historical_data: {
+        Row: {
+          close_price: number
+          created_at: string
+          date: string
+          high_price: number
+          id: number
+          low_price: number
+          open_price: number
+          symbol: string | null
+          volume: number
+        }
+        Insert: {
+          close_price: number
+          created_at?: string
+          date: string
+          high_price: number
+          id?: number
+          low_price: number
+          open_price: number
+          symbol?: string | null
+          volume: number
+        }
+        Update: {
+          close_price?: number
+          created_at?: string
+          date?: string
+          high_price?: number
+          id?: number
+          low_price?: number
+          open_price?: number
+          symbol?: string | null
+          volume?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_historical_data_symbol_fkey"
+            columns: ["symbol"]
+            isOneToOne: false
+            referencedRelation: "stocks"
+            referencedColumns: ["symbol"]
+          },
+        ]
+      }
+      stocks: {
+        Row: {
+          company_name: string
+          created_at: string
+          logo_url: string | null
+          symbol: string
+        }
+        Insert: {
+          company_name: string
+          created_at?: string
+          logo_url?: string | null
+          symbol: string
+        }
+        Update: {
+          company_name?: string
+          created_at?: string
+          logo_url?: string | null
+          symbol?: string
+        }
+        Relationships: []
+      }
       system_events: {
         Row: {
           description: string
