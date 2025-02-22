@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,7 +25,6 @@ const Index = () => {
     changePercent: 1.23,
   });
 
-  // Fetch stock details
   const { data: stockDetails } = useQuery({
     queryKey: ['stockDetails', selectedStock.symbol],
     queryFn: async () => {
@@ -42,7 +40,6 @@ const Index = () => {
     enabled: !!selectedStock.symbol
   });
 
-  // Fetch historical data
   const { data: historicalData } = useQuery({
     queryKey: ['historicalData', selectedStock.symbol],
     queryFn: async () => {
@@ -62,7 +59,6 @@ const Index = () => {
     enabled: !!selectedStock.symbol
   });
 
-  // Fetch news data
   const { data: newsData, isLoading: isLoadingNews } = useQuery({
     queryKey: ['news', selectedStock.symbol],
     queryFn: async () => {
@@ -76,7 +72,6 @@ const Index = () => {
     enabled: !!selectedStock.symbol
   });
 
-  // Fetch prediction data
   const { data: predictionData, isLoading: isLoadingPrediction } = useQuery({
     queryKey: ['prediction', selectedStock.symbol],
     queryFn: async () => {
@@ -95,7 +90,6 @@ const Index = () => {
     enabled: !!selectedStock.symbol && !!historicalData && !!newsData
   });
 
-  // Set up WebSocket connection for real-time price updates
   useEffect(() => {
     if (!selectedStock.symbol) return;
 
@@ -128,14 +122,12 @@ const Index = () => {
 
       if (error) throw error;
 
-      setSelectedStock({
+      setSelectedStock(prev => ({
+        ...prev,
         symbol,
-        price: selectedStock.price,
-        change: selectedStock.change,
-        changePercent: selectedStock.changePercent,
         logoUrl: stockInfo.logo_url,
         companyName: stockInfo.company_name
-      });
+      }));
       
       toast.success(`Successfully loaded data for ${symbol}`);
     } catch (error) {

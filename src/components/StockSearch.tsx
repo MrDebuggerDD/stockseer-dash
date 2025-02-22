@@ -58,7 +58,7 @@ const StockSearch = ({ onSearch }: StockSearchProps) => {
   };
 
   return (
-    <Card className="glass-card p-4 animate-fade-up relative">
+    <Card className="glass-card p-4 animate-fade-up relative z-50">
       <form onSubmit={handleSubmit} className="flex gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
@@ -70,7 +70,7 @@ const StockSearch = ({ onSearch }: StockSearchProps) => {
             className="search-input pl-10"
           />
           {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg">
+            <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg">
               {suggestions.map((stock) => (
                 <div
                   key={stock.symbol}

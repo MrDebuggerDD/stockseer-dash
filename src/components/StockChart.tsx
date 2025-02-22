@@ -21,6 +21,16 @@ const StockChart = ({ data, isLoading }: StockChartProps) => {
     );
   }
 
+  if (!data || data.length === 0) {
+    return (
+      <Card className="stock-chart">
+        <div className="h-full w-full flex items-center justify-center">
+          <p className="text-muted-foreground">No data available</p>
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <Card className="stock-chart animate-fade-up">
       <ResponsiveContainer width="100%" height="100%">
@@ -41,6 +51,7 @@ const StockChart = ({ data, isLoading }: StockChartProps) => {
             axisLine={false}
             tickLine={false}
             tick={{ fill: '#94a3b8', fontSize: 12 }}
+            domain={['auto', 'auto']}
           />
           <Tooltip
             contentStyle={{
