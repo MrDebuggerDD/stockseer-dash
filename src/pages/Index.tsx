@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,9 +21,9 @@ interface StockData {
 const Index = () => {
   const [selectedStock, setSelectedStock] = useState<StockData>({
     symbol: "AAPL",
-    price: 191.56,
-    change: 2.34,
-    changePercent: 1.23,
+    price: 0,
+    change: 0,
+    changePercent: 0,
   });
 
   const { data: stockDetails } = useQuery({
@@ -40,24 +41,32 @@ const Index = () => {
     enabled: !!selectedStock.symbol
   });
 
-  const { data: historicalData } = useQuery({
-    queryKey: ['historicalData', selectedStock.symbol],
+  // Fetch real-time and historical data from Yahoo Finance
+  const { data: yahooData, isLoading: isLoadingYahoo } = useQuery({
+    queryKey: ['yahooData', selectedStock.symbol],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('stock_historical_data')
-        .select('*')
-        .eq('symbol', selectedStock.symbol)
-        .order('date', { ascending: true })
-        .limit(30);
+      const { data, error } = await supabase.functions.invoke('yahoo-finance', {
+        body: { symbol: selectedStock.symbol }
+      });
       
       if (error) throw error;
-      return data?.map(d => ({
-        date: new Date(d.date).toLocaleDateString(),
-        price: Number(d.close_price)
-      }));
+      return data;
     },
-    enabled: !!selectedStock.symbol
+    enabled: !!selectedStock.symbol,
+    refetchInterval: 60000 // Refetch every minute
   });
+
+  // Update stock data when Yahoo data changes
+  useEffect(() => {
+    if (yahooData) {
+      setSelectedStock(prev => ({
+        ...prev,
+        price: yahooData.currentPrice,
+        change: yahooData.priceChange,
+        changePercent: yahooData.percentChange
+      }));
+    }
+  }, [yahooData]);
 
   const { data: newsData, isLoading: isLoadingNews } = useQuery({
     queryKey: ['news', selectedStock.symbol],
@@ -79,7 +88,7 @@ const Index = () => {
         body: { 
           symbol: selectedStock.symbol,
           price: selectedStock.price,
-          historicalData: historicalData,
+          historicalData: yahooData?.historicalData,
           news: newsData
         }
       });
@@ -87,30 +96,8 @@ const Index = () => {
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedStock.symbol && !!historicalData && !!newsData
+    enabled: !!selectedStock.symbol && !!yahooData?.historicalData && !!newsData
   });
-
-  useEffect(() => {
-    if (!selectedStock.symbol) return;
-
-    const channel = supabase
-      .channel('stock-updates')
-      .on('broadcast', { event: 'price-update' }, (payload) => {
-        if (payload.symbol === selectedStock.symbol) {
-          setSelectedStock(prev => ({
-            ...prev,
-            price: payload.price,
-            change: payload.change,
-            changePercent: payload.changePercent
-          }));
-        }
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [selectedStock.symbol]);
 
   const handleSearch = async (symbol: string) => {
     try {
@@ -149,7 +136,10 @@ const Index = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3">
-          <StockChart data={historicalData || []} />
+          <StockChart 
+            data={yahooData?.historicalData || []} 
+            isLoading={isLoadingYahoo}
+          />
         </div>
         <div className="space-y-6">
           <StockPrice 
