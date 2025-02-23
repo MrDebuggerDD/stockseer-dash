@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { Search } from "lucide-react";
 import { Input } from "./ui/input";
 import { Card } from "./ui/card";
-import { supabase } from "@/integrations/supabase/client";
 
 interface StockSearchProps {
   onSearch: (symbol: string) => void;
@@ -12,7 +11,6 @@ interface StockSearchProps {
 interface StockSuggestion {
   symbol: string;
   company_name: string;
-  logo_url: string | null;
 }
 
 const StockSearch = ({ onSearch }: StockSearchProps) => {
@@ -24,14 +22,13 @@ const StockSearch = ({ onSearch }: StockSearchProps) => {
     const fetchSuggestions = async () => {
       if (symbol.trim().length > 0) {
         try {
-          const response = await fetch(`https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(symbol)}&quotesCount=5&newsCount=0&enableFuzzyQuery=false&quotesQueryId=tss_match_phrase_query`);
+          const response = await fetch(`https://query2.finance.yahoo.com/v6/finance/autocomplete?query=${encodeURIComponent(symbol)}&lang=en`);
           const data = await response.json();
           
-          if (data.quotes) {
-            const suggestions = data.quotes.map((quote: any) => ({
-              symbol: quote.symbol,
-              company_name: quote.longname || quote.shortname,
-              logo_url: null
+          if (data.ResultSet?.Result) {
+            const suggestions = data.ResultSet.Result.map((result: any) => ({
+              symbol: result.symbol,
+              company_name: result.name
             }));
             setSuggestions(suggestions);
             setShowSuggestions(true);

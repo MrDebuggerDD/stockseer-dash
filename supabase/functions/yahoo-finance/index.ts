@@ -8,44 +8,37 @@ const corsHeaders = {
 
 async function fetchYahooFinanceData(symbol: string) {
   try {
-    // Fetch quote data
-    const quoteResponse = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1mo`);
-    const quoteData = await quoteResponse.json();
+    // Use Yahoo Finance API v6 for more reliable data
+    const response = await fetch(`https://query2.finance.yahoo.com/v6/finance/quote?symbols=${symbol}`);
+    if (!response.ok) throw new Error('Failed to fetch data');
     
-    if (quoteData.error) {
-      throw new Error(quoteData.error.description);
+    const data = await response.json();
+    if (!data.quoteResponse?.result?.[0]) {
+      throw new Error('No data found for symbol');
     }
 
-    // Fetch company info
-    const infoResponse = await fetch(`https://query1.finance.yahoo.com/v10/finance/quoteSummary/${symbol}?modules=price,summaryProfile`);
-    const infoData = await infoResponse.json();
-
-    const result = quoteData.chart.result[0];
-    const timestamps = result.timestamp;
-    const quotes = result.indicators.quote[0];
-    const prices = quotes.close;
-
-    // Get current price and market changes
-    const currentPrice = prices[prices.length - 1];
-    const previousPrice = prices[prices.length - 2];
-    const priceChange = currentPrice - previousPrice;
-    const percentChange = (priceChange / previousPrice) * 100;
-
-    // Get company name from info data
-    const companyName = infoData.quoteSummary.result[0].price.longName;
+    const quote = data.quoteResponse.result[0];
+    
+    // Get historical data
+    const historicalResponse = await fetch(`https://query2.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1mo`);
+    if (!historicalResponse.ok) throw new Error('Failed to fetch historical data');
+    
+    const historicalData = await historicalResponse.json();
+    const timestamps = historicalData.chart.result[0].timestamp;
+    const prices = historicalData.chart.result[0].indicators.quote[0].close;
 
     // Format historical data
-    const historicalData = timestamps.map((timestamp: number, index: number) => ({
+    const formattedHistoricalData = timestamps.map((timestamp: number, index: number) => ({
       date: new Date(timestamp * 1000).toLocaleDateString(),
-      price: prices[index]
+      price: prices[index] || null
     })).filter((item: any) => item.price !== null);
 
     return {
-      currentPrice,
-      priceChange,
-      percentChange,
-      historicalData,
-      companyName
+      currentPrice: quote.regularMarketPrice,
+      priceChange: quote.regularMarketChange,
+      percentChange: quote.regularMarketChangePercent,
+      companyName: quote.longName || quote.shortName,
+      historicalData: formattedHistoricalData
     };
   } catch (error) {
     console.error('Error fetching Yahoo Finance data:', error);
@@ -60,10 +53,11 @@ serve(async (req) => {
 
   try {
     const { symbol } = await req.json();
+    if (!symbol) throw new Error('Symbol is required');
+    
     console.log('Fetching data for symbol:', symbol);
-
     const data = await fetchYahooFinanceData(symbol);
-    console.log('Successfully fetched data:', data);
+    console.log('Successfully fetched data for', symbol);
 
     return new Response(
       JSON.stringify(data),
