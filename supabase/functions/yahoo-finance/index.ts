@@ -8,14 +8,19 @@ const corsHeaders = {
 
 async function fetchYahooFinanceData(symbol: string) {
   try {
-    const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1mo`);
-    const data = await response.json();
+    // Fetch quote data
+    const quoteResponse = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1mo`);
+    const quoteData = await quoteResponse.json();
     
-    if (data.error) {
-      throw new Error(data.error.description);
+    if (quoteData.error) {
+      throw new Error(quoteData.error.description);
     }
 
-    const result = data.chart.result[0];
+    // Fetch company info
+    const infoResponse = await fetch(`https://query1.finance.yahoo.com/v10/finance/quoteSummary/${symbol}?modules=price,summaryProfile`);
+    const infoData = await infoResponse.json();
+
+    const result = quoteData.chart.result[0];
     const timestamps = result.timestamp;
     const quotes = result.indicators.quote[0];
     const prices = quotes.close;
@@ -25,6 +30,9 @@ async function fetchYahooFinanceData(symbol: string) {
     const previousPrice = prices[prices.length - 2];
     const priceChange = currentPrice - previousPrice;
     const percentChange = (priceChange / previousPrice) * 100;
+
+    // Get company name from info data
+    const companyName = infoData.quoteSummary.result[0].price.longName;
 
     // Format historical data
     const historicalData = timestamps.map((timestamp: number, index: number) => ({
@@ -36,7 +44,8 @@ async function fetchYahooFinanceData(symbol: string) {
       currentPrice,
       priceChange,
       percentChange,
-      historicalData
+      historicalData,
+      companyName
     };
   } catch (error) {
     console.error('Error fetching Yahoo Finance data:', error);

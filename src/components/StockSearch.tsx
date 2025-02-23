@@ -23,16 +23,21 @@ const StockSearch = ({ onSearch }: StockSearchProps) => {
   useEffect(() => {
     const fetchSuggestions = async () => {
       if (symbol.trim().length > 0) {
-        const { data, error } = await supabase
-          .from('stocks')
-          .select('*')
-          .ilike('symbol', `${symbol}%`)
-          .order('symbol')
-          .limit(5);
-
-        if (!error && data) {
-          setSuggestions(data);
-          setShowSuggestions(true);
+        try {
+          const response = await fetch(`https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(symbol)}&quotesCount=5&newsCount=0&enableFuzzyQuery=false&quotesQueryId=tss_match_phrase_query`);
+          const data = await response.json();
+          
+          if (data.quotes) {
+            const suggestions = data.quotes.map((quote: any) => ({
+              symbol: quote.symbol,
+              company_name: quote.longname || quote.shortname,
+              logo_url: null
+            }));
+            setSuggestions(suggestions);
+            setShowSuggestions(true);
+          }
+        } catch (error) {
+          console.error('Error fetching suggestions:', error);
         }
       } else {
         setSuggestions([]);
@@ -40,7 +45,8 @@ const StockSearch = ({ onSearch }: StockSearchProps) => {
       }
     };
 
-    fetchSuggestions();
+    const debounceTimer = setTimeout(fetchSuggestions, 300);
+    return () => clearTimeout(debounceTimer);
   }, [symbol]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -64,9 +70,9 @@ const StockSearch = ({ onSearch }: StockSearchProps) => {
           <Search className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Enter stock symbol (e.g., AAPL)"
+            placeholder="Search any stock symbol or company name..."
             value={symbol}
-            onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+            onChange={(e) => setSymbol(e.target.value)}
             className="search-input pl-10"
           />
           {showSuggestions && suggestions.length > 0 && (
@@ -77,13 +83,6 @@ const StockSearch = ({ onSearch }: StockSearchProps) => {
                   className="flex items-center gap-3 p-3 hover:bg-secondary cursor-pointer"
                   onClick={() => handleSuggestionClick(stock.symbol)}
                 >
-                  {stock.logo_url && (
-                    <img 
-                      src={stock.logo_url} 
-                      alt={stock.company_name} 
-                      className="w-6 h-6 rounded"
-                    />
-                  )}
                   <div>
                     <div className="font-medium">{stock.symbol}</div>
                     <div className="text-sm text-muted-foreground">{stock.company_name}</div>

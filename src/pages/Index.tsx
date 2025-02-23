@@ -26,6 +26,7 @@ const Index = () => {
     changePercent: 0,
   });
 
+  // First try to get company info from our database
   const { data: stockDetails } = useQuery({
     queryKey: ['stockDetails', selectedStock.symbol],
     queryFn: async () => {
@@ -33,7 +34,7 @@ const Index = () => {
         .from('stocks')
         .select('*')
         .eq('symbol', selectedStock.symbol)
-        .single();
+        .maybeSingle();
       
       if (error) throw error;
       return data;
@@ -63,10 +64,11 @@ const Index = () => {
         ...prev,
         price: yahooData.currentPrice,
         change: yahooData.priceChange,
-        changePercent: yahooData.percentChange
+        changePercent: yahooData.percentChange,
+        companyName: yahooData.companyName || stockDetails?.company_name || prev.companyName
       }));
     }
-  }, [yahooData]);
+  }, [yahooData, stockDetails]);
 
   const { data: newsData, isLoading: isLoadingNews } = useQuery({
     queryKey: ['news', selectedStock.symbol],
@@ -76,7 +78,7 @@ const Index = () => {
       });
       
       if (error) throw error;
-      return data;
+      return data || [];
     },
     enabled: !!selectedStock.symbol
   });
@@ -101,22 +103,13 @@ const Index = () => {
 
   const handleSearch = async (symbol: string) => {
     try {
-      const { data: stockInfo, error } = await supabase
-        .from('stocks')
-        .select('*')
-        .eq('symbol', symbol)
-        .single();
-
-      if (error) throw error;
-
+      // Update the selected stock immediately with the symbol
       setSelectedStock(prev => ({
         ...prev,
         symbol,
-        logoUrl: stockInfo.logo_url,
-        companyName: stockInfo.company_name
       }));
       
-      toast.success(`Successfully loaded data for ${symbol}`);
+      toast.success(`Loading data for ${symbol}`);
     } catch (error) {
       console.error('Error fetching stock data:', error);
       toast.error('Failed to fetch stock data');
@@ -145,10 +138,9 @@ const Index = () => {
           <StockPrice 
             {...selectedStock} 
             logoUrl={stockDetails?.logo_url}
-            companyName={stockDetails?.company_name}
           />
           {predictionData && <PredictionCard predictionData={predictionData} />}
-          {newsData && <NewsCard news={newsData} />}
+          {newsData && newsData.length > 0 && <NewsCard news={newsData} />}
         </div>
       </div>
     </div>
