@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import { Search } from "lucide-react";
 import { Input } from "./ui/input";
 import { Card } from "./ui/card";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface StockSearchProps {
   onSearch: (symbol: string) => void;
@@ -14,27 +16,28 @@ interface StockSuggestion {
 }
 
 const StockSearch = ({ onSearch }: StockSearchProps) => {
-  const [symbol, setSymbol] = useState("");
+  const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<StockSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const fetchSuggestions = async () => {
-      if (symbol.trim().length > 0) {
+      if (query.trim().length > 0) {
+        setIsLoading(true);
         try {
-          const response = await fetch(`https://query2.finance.yahoo.com/v6/finance/autocomplete?query=${encodeURIComponent(symbol)}&lang=en`);
-          const data = await response.json();
-          
-          if (data.ResultSet?.Result) {
-            const suggestions = data.ResultSet.Result.map((result: any) => ({
-              symbol: result.symbol,
-              company_name: result.name
-            }));
-            setSuggestions(suggestions);
-            setShowSuggestions(true);
-          }
+          const { data, error } = await supabase.functions.invoke('stock-search', {
+            body: { query: query }
+          });
+
+          if (error) throw error;
+          setSuggestions(data || []);
+          setShowSuggestions(true);
         } catch (error) {
           console.error('Error fetching suggestions:', error);
+          toast.error('Failed to fetch suggestions');
+        } finally {
+          setIsLoading(false);
         }
       } else {
         setSuggestions([]);
@@ -44,18 +47,18 @@ const StockSearch = ({ onSearch }: StockSearchProps) => {
 
     const debounceTimer = setTimeout(fetchSuggestions, 300);
     return () => clearTimeout(debounceTimer);
-  }, [symbol]);
+  }, [query]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (symbol.trim()) {
-      onSearch(symbol.toUpperCase());
+    if (query.trim()) {
+      onSearch(query.toUpperCase());
       setShowSuggestions(false);
     }
   };
 
   const handleSuggestionClick = (selectedSymbol: string) => {
-    setSymbol(selectedSymbol);
+    setQuery(selectedSymbol);
     onSearch(selectedSymbol);
     setShowSuggestions(false);
   };
@@ -68,12 +71,12 @@ const StockSearch = ({ onSearch }: StockSearchProps) => {
           <Input
             type="text"
             placeholder="Search any stock symbol or company name..."
-            value={symbol}
-            onChange={(e) => setSymbol(e.target.value)}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
             className="search-input pl-10"
           />
           {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg">
+            <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-[300px] overflow-y-auto">
               {suggestions.map((stock) => (
                 <div
                   key={stock.symbol}
@@ -86,6 +89,11 @@ const StockSearch = ({ onSearch }: StockSearchProps) => {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+          {isLoading && (
+            <div className="absolute right-3 top-2.5">
+              <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full" />
             </div>
           )}
         </div>
