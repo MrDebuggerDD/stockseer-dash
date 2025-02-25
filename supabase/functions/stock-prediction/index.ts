@@ -1,6 +1,5 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import "https://deno.land/x/xhr@0.1.0/mod.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,6 +16,14 @@ interface NewsItem {
   sentiment: string;
 }
 
+// Calculate standard deviation
+function calculateStd(values: number[]): number {
+  const mean = values.reduce((acc, val) => acc + val, 0) / values.length;
+  const squareDiffs = values.map(value => Math.pow(value - mean, 2));
+  const avgSquareDiff = squareDiffs.reduce((acc, val) => acc + val, 0) / squareDiffs.length;
+  return Math.sqrt(avgSquareDiff);
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -24,6 +31,8 @@ serve(async (req) => {
 
   try {
     const { symbol, price, historicalData, news } = await req.json();
+
+    console.log('Received data for prediction:', { symbol, price, historicalDataLength: historicalData?.length });
 
     // Analyze historical data trends
     const prices = historicalData?.map((d: HistoricalDataPoint) => d.price) || [];
@@ -40,21 +49,24 @@ serve(async (req) => {
     // Combine historical and news analysis
     const direction = (trend === "up" && newsSentiment >= 0) || 
                      (trend === "down" && newsSentiment < 0) ? trend : 
-                     (Math.random() > 0.5 ? "up" : "down");
+                     "neutral";
 
     // Calculate confidence based on consistency of signals
     const confidence = 0.5 + (Math.abs(newsSentiment) / (news?.length || 1)) * 0.3;
     
     // Calculate target price
-    const volatility = Math.std(prices) / avgPrice;
-    const priceChange = price * volatility * (direction === "up" ? 1 : -1);
+    const volatility = calculateStd(prices) / avgPrice;
+    const priceChange = price * volatility * (direction === "up" ? 1 : direction === "down" ? -1 : 0.5);
+    const nextTarget = price + priceChange;
 
     const prediction = {
-      direction,
+      direction: direction as "up" | "down" | "neutral",
       confidence,
-      nextTarget: price + priceChange,
+      nextTarget,
       timeframe: "24h"
     };
+
+    console.log('Generated prediction:', prediction);
 
     return new Response(JSON.stringify(prediction), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
