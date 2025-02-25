@@ -57,35 +57,39 @@ const Index = () => {
     refetchInterval: 60000 // Refetch every minute
   });
 
-  // Example news data
-  const exampleNews = [
-    {
-      title: `Latest update on ${selectedStock.symbol}`,
-      source: "Market News",
-      sentiment: "positive" as const,
-      time: "2 hours ago"
+  // Fetch news data
+  const { data: newsData, isLoading: isLoadingNews } = useQuery({
+    queryKey: ['news', selectedStock.symbol],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('fetch-news', {
+        body: { symbol: selectedStock.symbol }
+      });
+      
+      if (error) throw error;
+      return data || [];
     },
-    {
-      title: `Industry analysis for ${selectedStock.symbol}`,
-      source: "Financial Times",
-      sentiment: "neutral" as const,
-      time: "4 hours ago"
-    },
-    {
-      title: `Market trends affecting ${selectedStock.symbol}`,
-      source: "Bloomberg",
-      sentiment: "negative" as const,
-      time: "6 hours ago"
-    }
-  ];
+    enabled: !!selectedStock.symbol,
+    refetchInterval: 300000 // Refetch every 5 minutes
+  });
 
-  // Example prediction data
-  const examplePrediction = {
-    direction: yahooData?.priceChange >= 0 ? "up" as const : "down" as const,
-    confidence: 0.75,
-    nextTarget: (yahooData?.currentPrice || 0) * 1.05, // 5% above current price
-    timeframe: "24h"
-  };
+  // Get prediction based on historical data and news
+  const { data: predictionData, isLoading: isLoadingPrediction } = useQuery({
+    queryKey: ['prediction', selectedStock.symbol, yahooData?.currentPrice, newsData],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('stock-prediction', {
+        body: { 
+          symbol: selectedStock.symbol,
+          price: yahooData?.currentPrice,
+          historicalData: yahooData?.historicalData,
+          news: newsData
+        }
+      });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedStock.symbol && !!yahooData?.historicalData && !!newsData
+  });
 
   // Update stock data when Yahoo data changes
   useEffect(() => {
@@ -137,8 +141,8 @@ const Index = () => {
             {...selectedStock} 
             logoUrl={stockDetails?.logo_url}
           />
-          <PredictionCard predictionData={examplePrediction} />
-          <NewsCard news={exampleNews} />
+          {predictionData && <PredictionCard predictionData={predictionData} />}
+          {newsData && newsData.length > 0 && <NewsCard news={newsData} />}
         </div>
       </div>
     </div>
