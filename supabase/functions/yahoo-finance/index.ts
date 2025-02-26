@@ -60,44 +60,64 @@ serve(async (req) => {
         .maybeSingle()
 
       if (!existingStock?.logo_url) {
-        // Try multiple approaches to get the logo
-        const website = companyInfo?.assetProfile?.website || companyInfo?.summaryProfile?.website
-        if (website) {
-          // Try main domain first
-          const domain = new URL(website).hostname.replace('www.', '')
-          const clearbitUrl = `https://logo.clearbit.com/${domain}?size=100`
-          const logoResponse = await fetch(clearbitUrl)
-          
-          if (logoResponse.ok) {
-            logoUrl = clearbitUrl
-          } else {
-            // Try alternative sources
-            // Try Yahoo Finance logo (if available)
-            try {
-              const yahooLogoUrl = `https://s.yimg.com/aq/autoc/td/data/logos/${symbol}.png`
-              const yahooResponse = await fetch(yahooLogoUrl)
-              if (yahooResponse.ok) {
-                logoUrl = yahooLogoUrl
-              }
-            } catch (error) {
-              console.error('Error fetching Yahoo logo:', error)
-            }
+        // Company-specific logo handling
+        const specialCases: Record<string, string> = {
+          'NVDA': 'https://logo.clearbit.com/nvidia.com',
+          'AAPL': 'https://logo.clearbit.com/apple.com',
+          'MSFT': 'https://logo.clearbit.com/microsoft.com',
+          'GOOGL': 'https://logo.clearbit.com/google.com',
+          'META': 'https://logo.clearbit.com/meta.com',
+          'AMZN': 'https://logo.clearbit.com/amazon.com',
+          'TSLA': 'https://logo.clearbit.com/tesla.com',
+          'NFLX': 'https://logo.clearbit.com/netflix.com',
+          'IBM': 'https://logo.clearbit.com/ibm.com',
+          'INTC': 'https://logo.clearbit.com/intel.com',
+          'AMD': 'https://logo.clearbit.com/amd.com',
+          'ADBE': 'https://logo.clearbit.com/adobe.com',
+          'CSCO': 'https://logo.clearbit.com/cisco.com',
+          'CRM': 'https://logo.clearbit.com/salesforce.com',
+          'ORCL': 'https://logo.clearbit.com/oracle.com',
+          'QCOM': 'https://logo.clearbit.com/qualcomm.com',
+          'TCS': 'https://logo.clearbit.com/tcs.com',
+          'INFY': 'https://logo.clearbit.com/infosys.com',
+          'WIT': 'https://logo.clearbit.com/wipro.com',
+          'HCLTECH.NS': 'https://logo.clearbit.com/hcltech.com',
+          'TECHM.NS': 'https://logo.clearbit.com/techmahindra.com',
+        }
 
-            // If still no logo, try company name-based approach with Clearbit
-            if (!logoUrl) {
-              const companyDomain = companyName.toLowerCase()
-                .replace(/[^a-z0-9]/g, '')
-                .replace(/corporation|corp|inc|ltd|limited/g, '')
-              const altClearbitUrl = `https://logo.clearbit.com/${companyDomain}.com?size=100`
-              const altResponse = await fetch(altClearbitUrl)
-              if (altResponse.ok) {
-                logoUrl = altClearbitUrl
-              } else {
-                // Final fallback to a stock market related image
-                logoUrl = "https://images.unsplash.com/photo-1496307653780-42ee777d4833?w=100&h=100&fit=crop"
-              }
+        // Try special cases first
+        if (specialCases[symbol]) {
+          const response = await fetch(specialCases[symbol])
+          if (response.ok) {
+            logoUrl = specialCases[symbol]
+          }
+        }
+
+        // If no special case or it failed, try Yahoo Finance logo
+        if (!logoUrl) {
+          const yahooLogoUrl = `https://s.yimg.com/aq/autoc/td/data/logos/${symbol}.png`
+          const yahooResponse = await fetch(yahooLogoUrl)
+          if (yahooResponse.ok) {
+            logoUrl = yahooLogoUrl
+          }
+        }
+
+        // If Yahoo fails, try to get website from company info and use Clearbit
+        if (!logoUrl) {
+          const website = companyInfo?.assetProfile?.website || companyInfo?.summaryProfile?.website
+          if (website) {
+            const domain = new URL(website).hostname.replace('www.', '')
+            const clearbitUrl = `https://logo.clearbit.com/${domain}`
+            const response = await fetch(clearbitUrl)
+            if (response.ok) {
+              logoUrl = clearbitUrl
             }
           }
+        }
+
+        // If all else fails, use a default stock market image
+        if (!logoUrl) {
+          logoUrl = "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=100&h=100&fit=crop"
         }
 
         // Save to database
@@ -113,8 +133,7 @@ serve(async (req) => {
       }
     } catch (error) {
       console.error('Error handling logo:', error)
-      // Use a default stock market building image as final fallback
-      logoUrl = "https://images.unsplash.com/photo-1496307653780-42ee777d4833?w=100&h=100&fit=crop"
+      logoUrl = "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=100&h=100&fit=crop"
     }
 
     return new Response(
