@@ -28,8 +28,8 @@ serve(async (req) => {
       throw new Error(data.error.description)
     }
 
-    // Get company info
-    const infoResponse = await fetch(`https://query1.finance.yahoo.com/v10/finance/quoteSummary/${symbol}?modules=price,summaryProfile`)
+    // Get company info with more details
+    const infoResponse = await fetch(`https://query1.finance.yahoo.com/v10/finance/quoteSummary/${symbol}?modules=price,summaryProfile,assetProfile`)
     const infoData = await infoResponse.json()
     const companyInfo = infoData?.quoteSummary?.result?.[0]
 
@@ -47,7 +47,7 @@ serve(async (req) => {
     const priceChange = currentPrice - previousClose
     const percentChange = (priceChange / previousClose) * 100
 
-    // Try to get or create company logo
+    // Enhanced logo handling
     const companyName = companyInfo?.price?.longName || ''
     let logoUrl = null
 
@@ -59,16 +59,45 @@ serve(async (req) => {
         .eq('symbol', symbol)
         .maybeSingle()
 
-      if (!existingStock) {
-        // If not found, try to get logo from Clearbit API
-        const clearbitUrl = `https://logo.clearbit.com/${companyInfo?.summaryProfile?.website}?size=100`
-        const logoResponse = await fetch(clearbitUrl)
-        
-        if (logoResponse.ok) {
-          logoUrl = clearbitUrl
-        } else {
-          // Fallback to default placeholder
-          logoUrl = `https://ui-avatars.com/api/?name=${symbol}&background=random`
+      if (!existingStock?.logo_url) {
+        // Try multiple approaches to get the logo
+        const website = companyInfo?.assetProfile?.website || companyInfo?.summaryProfile?.website
+        if (website) {
+          // Try main domain first
+          const domain = new URL(website).hostname.replace('www.', '')
+          const clearbitUrl = `https://logo.clearbit.com/${domain}?size=100`
+          const logoResponse = await fetch(clearbitUrl)
+          
+          if (logoResponse.ok) {
+            logoUrl = clearbitUrl
+          } else {
+            // Try alternative sources
+            // Try Yahoo Finance logo (if available)
+            try {
+              const yahooLogoUrl = `https://s.yimg.com/aq/autoc/td/data/logos/${symbol}.png`
+              const yahooResponse = await fetch(yahooLogoUrl)
+              if (yahooResponse.ok) {
+                logoUrl = yahooLogoUrl
+              }
+            } catch (error) {
+              console.error('Error fetching Yahoo logo:', error)
+            }
+
+            // If still no logo, try company name-based approach with Clearbit
+            if (!logoUrl) {
+              const companyDomain = companyName.toLowerCase()
+                .replace(/[^a-z0-9]/g, '')
+                .replace(/corporation|corp|inc|ltd|limited/g, '')
+              const altClearbitUrl = `https://logo.clearbit.com/${companyDomain}.com?size=100`
+              const altResponse = await fetch(altClearbitUrl)
+              if (altResponse.ok) {
+                logoUrl = altClearbitUrl
+              } else {
+                // Final fallback to a stock market related image
+                logoUrl = "https://images.unsplash.com/photo-1496307653780-42ee777d4833?w=100&h=100&fit=crop"
+              }
+            }
+          }
         }
 
         // Save to database
@@ -84,6 +113,8 @@ serve(async (req) => {
       }
     } catch (error) {
       console.error('Error handling logo:', error)
+      // Use a default stock market building image as final fallback
+      logoUrl = "https://images.unsplash.com/photo-1496307653780-42ee777d4833?w=100&h=100&fit=crop"
     }
 
     return new Response(
