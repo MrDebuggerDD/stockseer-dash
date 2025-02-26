@@ -19,10 +19,10 @@ const StockPrice = ({
   logoUrl, 
   companyName 
 }: StockPriceProps) => {
-  const isPositive = change >= 0;
-  const isLoading = price === 0 && change === 0 && changePercent === 0;
+  const isPositive = change > 0;
+  const hasNoData = change === 0 && changePercent === 0;
 
-  // Safely handle potentially null values and loading state
+  // Safely handle potentially null values
   const formatNumber = (value: number | null) => {
     if (value === null || isNaN(value)) return "0.00";
     return value.toFixed(2);
@@ -40,7 +40,7 @@ const StockPrice = ({
             <p className="text-sm text-muted-foreground">{companyName}</p>
           )}
         </div>
-        {!isLoading && (
+        {!hasNoData && (
           isPositive ? (
             <TrendingUp className="w-5 h-5 text-success ml-auto" />
           ) : (
@@ -49,19 +49,16 @@ const StockPrice = ({
         )}
       </div>
       <p className="text-3xl font-bold mt-2">
-        ${isLoading ? "..." : formatNumber(price)}
+        ${price ? formatNumber(price) : "..."}
       </p>
-      {!isLoading && (
+      {hasNoData ? (
+        <div className="h-6" /> // Empty space to maintain layout
+      ) : (
         <div className={isPositive ? "trend-positive" : "trend-negative"}>
           <span className="font-medium">
-            {isPositive ? "+" : ""}
+            {change > 0 ? "+" : ""}
             {formatNumber(change)} ({formatNumber(changePercent)}%)
           </span>
-        </div>
-      )}
-      {isLoading && (
-        <div className="text-muted-foreground">
-          Loading...
         </div>
       )}
     </Card>
