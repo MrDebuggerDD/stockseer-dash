@@ -96,10 +96,11 @@ const Index = () => {
     if (yahooData) {
       setSelectedStock(prev => ({
         ...prev,
-        price: yahooData.currentPrice,
-        change: yahooData.priceChange,
-        changePercent: yahooData.percentChange,
-        companyName: yahooData.companyName || stockDetails?.company_name || prev.companyName
+        price: yahooData.currentPrice || 0,
+        change: yahooData.priceChange || 0,
+        changePercent: yahooData.percentChange || 0,
+        companyName: yahooData.companyName || stockDetails?.company_name,
+        logoUrl: yahooData.logoUrl || stockDetails?.logo_url
       }));
     }
   }, [yahooData, stockDetails]);
@@ -109,6 +110,10 @@ const Index = () => {
       setSelectedStock(prev => ({
         ...prev,
         symbol,
+        price: 0,
+        change: 0,
+        changePercent: 0,
+        companyName: '' // Reset company name when searching new stock
       }));
       
       toast.success(`Loading data for ${symbol}`);
